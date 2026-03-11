@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>SRT Takip Ekranı – Android Pro</title>
+<style>
+:root{
+  --bg: #000;
+  --fg: #fff;
+  --accent: #4ade80;
+  --panel-h: 48px;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, Noto Sans, "Apple Color Emoji", "Segoe UI Emoji";
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(var(--panel-h) + env(safe-area-inset-bottom, 0px)); /* panel görünürken metin panelin altına girmesin */
+  transition: padding-bottom .15s ease;
+}
+/* Üst kontrol çubuğu – sade ve kompakt */
+.toolbar {
+  display: flex;
+  gap: .25rem;
+  align-items: center;
+  padding: .4rem .5rem;
+  background: rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(6px);
+}
+.btn{ 
+  display: inline-flex; 
+  align-items: center; 
+  justify-content: center; 
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color: var(--fg); 
+  border-radius: .6rem; 
+  cursor: pointer; 
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .08s ease, opacity .15s ease; 
+}
+.btn:active{ transform: scale(0.95); }
+.btn-xs{ width: 28px; height: 28px; font-size: 12px; padding: 0; }
+.toolbar input[type="file"]{
+  display: inline-block;
+  width: 28px; height: 28px;
+  overflow: hidden;
+  border-radius: .6rem;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  cursor: pointer;
+}
+.toolbar input[type="file"]::-webkit-file-upload-button{ visibility: hidden; }
+.toolbar input[type="file"]::before{
+  content: "📄";
+  display: inline-flex; align-items: center; justify-content: center; width: 100%; height: 100%;
+  font-size: 14px; color: var(--fg);
+}
+.spacer { flex: 1 1 auto; }
+/* Oynatma alanı */
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.subtitle {
+  max-width: min(90ch, 92vw);
+  text-align: center;
+  font-size: clamp(18px, 5.5vw, 42px);
+  line-height: 1.28;
+  text-shadow: 0 2px 2px rgba(0,0,0,.8), 0 0 10px rgba(0,0,0,.55);
+}
+.muted { opacity: .6; }
+/* Durum satırı */
+.status {
+  padding: .25rem .5rem .6rem;
+  color: rgba(255,255,255,.7);
+  font-size: .8rem;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-wrap: wrap;
+}
+.pill {
+  border: 1px dashed rgba(255,255,255,.2);
+  padding: .15rem .35rem;
+  border-radius: 999px;
+}
+/* Alt panel (sabit) */
+.bottom-panel {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: 0;
+  height: var(--panel-h);
+  padding: 6px 60px 6px 6px; /* sağda toggle için boşluk */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(20,20,20,0.75);
+  border-top: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(8px);
+  z-index: 20;
+}
+.bottom-panel.hidden {
+  display: none;
+}
+.step-btn {
+  min-width: 56px;
+  height: 36px;
+  font-size: 12px;
+  padding: 0 .5rem;
+  border-radius: .6rem;
+}
+/* Sağ alt köşe – aç/kapat butonu (floating) */
+.fab {
+  position: fixed;
+  right: 10px;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  width: 44px; height: 44px;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  z-index: 30;
+  font-size: 18px;
+}
+@media (max-width: 820px){
+  .toolbar{ gap: .25rem; padding: .35rem .45rem; }
+  .btn-xs{ width: 26px; height: 26px; font-size: 11px; }
+  .subtitle{ font-size: clamp(16px, 5.2vw, 38px); }
+  .step-btn{ min-width: 52px; height: 34px; font-size: 11px; }
+}
+</style>
+</head>
+<body>
+  <!-- Üst çubuk: sade -->
+  <div class="toolbar">
+    <input id="file" type="file" accept=".srt,.txt,text/plain" title="SRT Yükle" />
+    <button id="play" class="btn btn-xs" title="Başlat (Space)">▶</button>
+    <button id="pause" class="btn btn-xs" title="Duraklat (Space)">❚❚</button>
+    <button id="reset" class="btn btn-xs" title="Sıfırla (R)">■</button>
+    <div class="spacer"></div>
+    <input id="fontSize" type="range" min="16" max="72" value="36" title="Yazı Boyutu" style="height: 22px;" />
+    <button id="fs" class="btn btn-xs" title="Tam Ekran (F)">⤢</button>
+  </div>
+
+  <div id="stage" class="stage">
+    <div id="subtitle" class="subtitle muted">Bir .srt dosyası yükleyin…</div>
+  </div>
+
+  <div class="status">
+    <span class="pill" id="loadedInfo">Yüklenen dosya: —</span>
+    <span class="pill" id="timeInfo">00:00.000</span>
+    <span class="pill" id="countInfo">0 satır</span>
+    <span class="pill" id="offsetInfo">Ofset: 0 ms</span>
+  </div>
+
+  <!-- Alt ofset paneli -->
+  <div id="bottomPanel" class="bottom-panel">
+    <!-- Geri -->
+    <button class="btn step-btn" data-step="-10000">⏪10s</button>
+    <button class="btn step-btn" data-step="-5000">⏪5s</button>
+    <button class="btn step-btn" data-step="-1000">⏪1s</button>
+    <button class="btn step-btn" data-step="-500">⏪0.5s</button>
+    <button class="btn step-btn" data-step="-100">⏪0.1s</button>
+    <!-- İleri -->
+    <button class="btn step-btn" data-step="100">0.1s⏩</button>
+    <button class="btn step-btn" data-step="500">0.5s⏩</button>
+    <button class="btn step-btn" data-step="1000">1s⏩</button>
+    <button class="btn step-btn" data-step="5000">5s⏩</button>
+    <button class="btn step-btn" data-step="10000">10s⏩</button>
+  </div>
+
+  <!-- Sağ alt köşe gizle/göster -->
+  <button id="togglePanel" class="btn fab" title="Ofset panelini gizle/göster">⚙️</button>
+
+<script>
+// --- SRT ayrıştırıcı ---
+function parseSRT(text) {
+  const blocks = text.replace(/\r/g, '').split(/\n\n+/);
+  const items = [];
+  for (const b of blocks) {
+    const lines = b.trim().split('\n');
+    if (lines.length >= 2) {
+      const timeLine = lines.length >= 2 && /-->/.test(lines[1]) ? lines[1] : lines[0];
+      const m = timeLine.match(/(\d{2}):(\d{2}):(\d{2}),(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2}),(\d{3})/);
+      if (!m) continue;
+      const toMs = (h, m, s, ms) => ((+h)*3600000) + ((+m)*60000) + ((+s)*1000) + (+ms);
+      const start = toMs(m[1], m[2], m[3], m[4]);
+      const end   = toMs(m[5], m[6], m[7], m[8]);
+      let textStartIndex = /-->/.test(lines[1]) ? 2 : 1;
+      const content = lines.slice(textStartIndex).join('\n').trim();
+      items.push({ start, end, text: content });
+    }
+  }
+  items.sort((a,b) => a.start - b.start);
+  return items;
+}
+
+// --- Yardımcılar ---
+const $ = (sel) => document.querySelector(sel);
+const subtitleEl = $('#subtitle');
+const timeInfo = $('#timeInfo');
+const loadedInfo = $('#loadedInfo');
+const countInfo = $('#countInfo');
+const offsetInfo = $('#offsetInfo');
+const bottomPanel = $('#bottomPanel');
+const togglePanelBtn = $('#togglePanel');
+
+let subtitles = [];
+let playing = false;
+let startEpoch = 0;   // Date.now referansı
+let pausedAt = 0;     // ms cinsinden kaldığı yer
+let idx = 0;          // hız için mevcut index
+let rafId = null;
+let offsetMs = 0;     // kullanıcı ofseti
+
+function formatMs(ms){
+  const neg = ms < 0;
+  ms = Math.abs(ms);
+  const s = Math.floor(ms/1000);
+  const mm = String(Math.floor(s/60)).padStart(2,'0');
+  const ss = String(s%60).padStart(2,'0');
+  const mmm = String(ms%1000).padStart(3,'0');
+  return (neg?'-':'') + `${mm}:${ss}.${mmm}`;
+}
+
+function currentTimeMs(){
+  return playing ? (Date.now() - startEpoch + pausedAt) : pausedAt;
+}
+
+function renderSubtitle(t){
+  // t: geçen süre (ms)
+  timeInfo.textContent = formatMs(t + offsetMs);
+  if (subtitles.length === 0) return;
+
+  const curT = t + offsetMs;
+
+  // Mevcut pencereyi koru
+  while (idx > 0 && curT < subtitles[idx].start) idx--;
+  while (idx < subtitles.length-1 && curT >= subtitles[idx].end) idx++;
+
+  const cur = subtitles[idx];
+  if (curT >= cur.start && curT < cur.end) {
+    subtitleEl.classList.remove('muted');
+    subtitleEl.innerHTML = cur.text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g,'<br/>');
+  } else {
+    subtitleEl.classList.add('muted');
+    subtitleEl.textContent = '';
+  }
+}
+
+function loop(){
+  if (!playing) return;
+  const t = Date.now() - startEpoch + pausedAt;
+  renderSubtitle(t);
+  rafId = requestAnimationFrame(loop);
+}
+
+function play(){
+  if (subtitles.length === 0) return;
+  if (playing) return;
+  startEpoch = Date.now();
+  playing = true;
+  loop();
+}
+function pause(){
+  if (!playing) return;
+  playing = false;
+  cancelAnimationFrame(rafId);
+  pausedAt += Date.now() - startEpoch;
+}
+function reset(){
+  playing = false;
+  cancelAnimationFrame(rafId);
+  startEpoch = 0;
+  pausedAt = 0;
+  idx = 0;
+  subtitleEl.classList.add('muted');
+  subtitleEl.textContent = '';
+  timeInfo.textContent = '00:00.000';
+}
+
+// --- Dosya yükleme (Android güvenli) ---
+document.getElementById('file').addEventListener('change', (e)=>{
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    if (reader.result != null) {
+      subtitles = parseSRT(String(reader.result));
+      loadedInfo.textContent = `Yüklenen dosya: ${file.name}`;
+      countInfo.textContent = `${subtitles.length} satır`;
+      reset();
+      subtitleEl.textContent = 'Hazır. Başlat tuşuna basın.';
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+  e.target.value = ''; // aynı dosya seçildiğinde tekrar tetiklensin
+});
+
+// --- Kontroller ---
+document.getElementById('play').addEventListener('click', play);
+document.getElementById('pause').addEventListener('click', pause);
+document.getElementById('reset').addEventListener('click', ()=>{ reset(); offsetMs = 0; offsetInfo.textContent = `Ofset: ${offsetMs} ms`; });
+
+document.getElementById('fontSize').addEventListener('input', (e)=>{
+  const val = Number(e.target.value);
+  subtitleEl.style.fontSize = val + 'px';
+});
+
+// Tam ekran: body hedef + vendor fallback
+function toggleFullscreen(){
+  const el = document.body; // mobilde body daha uyumlu
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (req) {
+      try {
+        const p = req.call(el);
+        if (p && typeof p.then === 'function') { p.catch(()=>{}); }
+      } catch(_) {}
+    }
+  } else {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+    exit && exit.call(document);
+  }
+}
+document.getElementById('fs').addEventListener('click', toggleFullscreen);
+
+// Ofset ayarlama
+function adjustOffset(delta){
+  offsetMs += delta;
+  offsetInfo.textContent = `Ofset: ${offsetMs} ms`;
+  renderSubtitle(currentTimeMs());
+}
+// Alt paneldeki tüm step butonlarına tek dinleyici
+bottomPanel.addEventListener('click', (e)=>{
+  const btn = e.target.closest('[data-step]');
+  if (!btn) return;
+  const delta = parseInt(btn.getAttribute('data-step'), 10);
+  if (Number.isFinite(delta)) adjustOffset(delta);
+});
+
+// Panel gizle/göster ve body padding ayarı
+function setPanelVisible(visible){
+  if (visible){
+    bottomPanel.classList.remove('hidden');
+    document.body.style.paddingBottom = `calc(var(--panel-h) + env(safe-area-inset-bottom, 0px))`;
+    togglePanelBtn.textContent = '⚙️';
+    togglePanelBtn.title = 'Ofset panelini gizle';
+  } else {
+    bottomPanel.classList.add('hidden');
+    document.body.style.paddingBottom = '0px';
+    togglePanelBtn.textContent = '⚙️';
+    togglePanelBtn.title = 'Ofset panelini göster';
+  }
+}
+let panelVisible = true;
+setPanelVisible(panelVisible);
+
+togglePanelBtn.addEventListener('click', ()=>{
+  panelVisible = !panelVisible;
+  setPanelVisible(panelVisible);
+});
+
+// Kısayollar (harici klavye): Space=başlat/duraklat, F=tam ekran, R=sıfırla, ,/. = +/-1s
+window.addEventListener('keydown', (e)=>{
+  const k = e.key.toLowerCase();
+  if (e.code === 'Space'){
+    e.preventDefault();
+    playing ? pause() : play();
+  } else if (k === 'f'){
+    toggleFullscreen();
+  } else if (k === 'r'){
+    reset(); offsetMs = 0; offsetInfo.textContent = `Ofset: ${offsetMs} ms`;
+  } else if (k === ','){ // -1s
+    adjustOffset(-1000);
+  } else if (k === '.'){ // +1s
+    adjustOffset(1000);
+  }
+});
+</script>
+</body>
+</html>
