@@ -5,7 +5,7 @@
 **Realtime SRT Subtitle Tracker**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-10b981.svg)](LICENSE)
-[![GitHub Pages](https://img.shields.io/badge/Hosted_on-GitHub_Pages-0969da.svg)](#)
+[![GitHub Pages](https://img.shields.io/badge/Hosted_on-GitHub_Pages-0969da.svg)](https://asa07-salihg.github.io/SyncSubs/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-34d399.svg)](#contributing)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-eab308.svg)](#)
 [![PWA Ready](https://img.shields.io/badge/PWA-Ready-3b82f6.svg)](#)
@@ -17,7 +17,7 @@ Load any `.srt` or `.vtt` file, play it in real-time, and fine-tune synchronizat
 
 **No installation. No backend. No tracking. Just subtitles.**
 
-[**Live Demo**](#) · [**Report Bug**](../../issues/new) · [**Request Feature**](../../issues/new)
+[**Live Demo**](https://asa07-salihg.github.io/SyncSubs/) · [**Report Bug**](../../issues/new) · [**Request Feature**](../../issues/new)
 
 <br>
 
@@ -50,7 +50,7 @@ Load any `.srt` or `.vtt` file, play it in real-time, and fine-tune synchronizat
 
 ### Online
 
-Visit the [**Live Demo**](#). No installation required. Your files are processed locally and never leave your device.
+Visit the [**Live Demo**](https://asa07-salihg.github.io/SyncSubs/). No installation required. Your files are processed locally and never leave your device.
 
 ### Local
 
